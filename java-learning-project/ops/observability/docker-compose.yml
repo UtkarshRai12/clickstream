@@ -1,0 +1,58 @@
+# Phase 7 dashboard. Does not start or stop the doris container.
+#
+# The Java processes bind metrics to 127.0.0.1. A bridge network cannot
+# reach the host's loopback, so these containers share the host network
+# and also listen only on 127.0.0.1.
+#
+# Start, from java-learning-project:
+#   docker compose -f ops/observability/docker-compose.yml up -d
+# Stop:
+#   docker compose -f ops/observability/docker-compose.yml down
+#
+# Java must be started from java-learning-project so logs/ lines up with
+# the Alloy mount.
+
+services:
+  loki:
+    image: grafana/loki:3.5.3
+    network_mode: host
+    command: ["-config.file=/etc/loki/local-config.yaml"]
+    volumes:
+      - ./loki-config.yaml:/etc/loki/local-config.yaml:ro
+
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    network_mode: host
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --web.listen-address=127.0.0.1:9090
+      - --storage.tsdb.path=/tmp/prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+
+  alloy:
+    image: grafana/alloy:v1.10.0
+    network_mode: host
+    depends_on: [loki]
+    command:
+      - run
+      - --server.http.listen-addr=127.0.0.1:12345
+      - --storage.path=/tmp/alloy
+      - /etc/alloy/config.alloy
+    volumes:
+      - ./config.alloy:/etc/alloy/config.alloy:ro
+      - ../../logs:/var/log/clickstream:ro
+
+  grafana:
+    image: grafana/grafana:12.1.0
+    network_mode: host
+    depends_on: [loki, prometheus]
+    environment:
+      GF_SERVER_HTTP_ADDR: 127.0.0.1
+      GF_SERVER_HTTP_PORT: "3000"
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro

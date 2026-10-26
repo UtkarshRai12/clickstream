@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+// Phase 3 contract for the synchronous report path.
+// Phase 6 implements this RPC. The HTTP call stays open until Doris answers.
+//
+// An empty user_id means every user in the tenant. The tenant always comes
+// from the token, never from the query string the analyst can edit.
+package clickstream.v1;
+
+option java_package = "com.learning.clickstream.proto.v1";
+option java_multiple_files = true;
+
+message DailyReportRequest {
+  string tenant_id = 1;
+  int64 from_epoch_ms = 2;
+  int64 to_epoch_ms = 3;
+  string user_id = 4;
+  int32 limit = 5;
+  string cursor = 6;
+}
+
+message DailyReportRow {
+  string day = 1;
+  string user_id = 2;
+  int64 event_count = 3;
+}
+
+message DailyReportResponse {
+  repeated DailyReportRow rows = 1;
+  string next_cursor = 2;
+}
+
+service QueryService {
+  rpc DailyReport (DailyReportRequest) returns (DailyReportResponse);
+}

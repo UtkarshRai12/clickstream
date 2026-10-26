@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Console stays a short line so a terminal is readable.
+  Phase 7 also writes logs/edge.json. One JSON object per line.
+  Logback's encoder nests MDC under "mdc", so request_id is mdc.request_id.
+  Alloy tails the file. The process cwd must be java-learning-project,
+  which is where `mvn -pl edge exec:java` is run from.
+  Code calls the SLF4J API. Logback is the implementation on the classpath.
+-->
+<configuration>
+  <appender name="console" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <pattern>%d{HH:mm:ss.SSS} %-5level [%logger{36}] %msg%n</pattern>
+    </encoder>
+  </appender>
+
+  <appender name="jsonFile" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <file>logs/edge.json</file>
+    <immediateFlush>true</immediateFlush>
+    <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+      <fileNamePattern>logs/edge.%d{yyyy-MM-dd}.%i.json</fileNamePattern>
+      <maxFileSize>10MB</maxFileSize>
+      <maxHistory>3</maxHistory>
+    </rollingPolicy>
+    <encoder class="ch.qos.logback.classic.encoder.JsonEncoder">
+      <withFormattedMessage>true</withFormattedMessage>
+      <withContext>false</withContext>
+      <withSequenceNumber>false</withSequenceNumber>
+      <withNanoseconds>false</withNanoseconds>
+    </encoder>
+  </appender>
+
+  <logger name="org.eclipse.jetty" level="warn"/>
+
+  <root level="info">
+    <appender-ref ref="console"/>
+    <appender-ref ref="jsonFile"/>
+  </root>
+</configuration>

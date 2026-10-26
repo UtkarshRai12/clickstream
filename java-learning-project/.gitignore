@@ -1,0 +1,20 @@
+target/
+.idea/
+*.iml
+
+# JSON logs written at runtime. Alloy reads this directory. Do not commit it.
+logs/
+
+# Local secrets. api-keys.csv comments hold the plaintext keys.
+# application.properties holds jwt.hmac-secret and internal.token.
+config/api-keys.csv
+config/application.properties
+
+# Written by Cursor's Java language server (Eclipse JDT). Not an Eclipse install.
+.project
+.classpath
+.factorypath
+.settings/
+
+# Scratch Postman body. Not part of the project.
+batch-100.json

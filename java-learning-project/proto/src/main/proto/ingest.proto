@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+// Phase 3 contract for the fire-and-forget ingest path.
+// Phase 5 implements this RPC. The edge streams events after it has already
+// returned HTTP 202. AcceptAck means the server queued the rows, not that
+// Doris has made them visible.
+//
+// Field numbers are the wire contract. Add new fields. Do not renumber these.
+package clickstream.v1;
+
+option java_package = "com.learning.clickstream.proto.v1";
+option java_multiple_files = true;
+
+message Event {
+  string event_id = 1;
+  string user_id = 2;
+  string event_type = 3;
+  int64 occurred_at_epoch_ms = 4;
+  string properties_json = 5;
+}
+
+// tenant_id is copied from the verified JWT by the edge.
+// The server does not parse public tokens. It trusts this field only because
+// the gRPC channel will carry a separate internal credential in phase 5.
+message IngestEvent {
+  string tenant_id = 1;
+  Event event = 2;
+}
+
+message AcceptAck {
+  int32 accepted_count = 1;
+}
+
+service IngestService {
+  rpc Accept (stream IngestEvent) returns (AcceptAck);
+}

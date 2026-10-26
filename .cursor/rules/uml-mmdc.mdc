@@ -1,0 +1,27 @@
+---
+description: Use mmdc (Mermaid CLI) as the default UML diagram renderer
+alwaysApply: true
+---
+
+# UML / diagram generation
+
+When generating or updating UML (class, sequence, component, deployment) or other architecture diagrams:
+
+1. **Author in Mermaid** (`.mmd` files under something like `docs/diagrams/`).
+2. **Render with `mmdc`** — do **not** rely on chat-default ASCII art, untitled canvas, or ad-hoc image tools as the primary output.
+3. Command pattern:
+
+```bash
+mmdc -i docs/diagrams/<name>.mmd -o docs/diagrams/<name>.svg
+# optional PNG:
+mmdc -i docs/diagrams/<name>.mmd -o docs/diagrams/<name>.png
+```
+
+4. Keep Mermaid relationship arrows correct:
+   - Implements / realization: `<|..`
+   - Extends / inheritance: `<|--`
+   - Association / dependency: `-->` or `..>`
+   - Never use the same arrow for inheritance and association.
+
+5. After writing `.mmd`, run `mmdc` and point the user at the generated `.svg`/`.png`.
+6. If `mmdc` is missing from PATH, use `/home/ur/.local/bin/mmdc` or `/home/ur/.local/lib/npm-global/bin/mmdc`.

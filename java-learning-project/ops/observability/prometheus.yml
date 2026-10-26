@@ -1,0 +1,13 @@
+# Scrapes the two Java processes on the host loopback.
+# Host network is what makes 127.0.0.1 the laptop, not the container.
+
+global:
+  scrape_interval: 5s
+
+scrape_configs:
+  - job_name: clickstream-edge
+    static_configs:
+      - targets: ["127.0.0.1:9464"]
+  - job_name: clickstream-server
+    static_configs:
+      - targets: ["127.0.0.1:9465"]

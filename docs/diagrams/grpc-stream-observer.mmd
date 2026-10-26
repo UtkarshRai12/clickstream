@@ -1,0 +1,28 @@
+%% Client-streaming RPC: stream IngestEvent → AcceptAck
+%% (matches ingest.proto Accept)
+sequenceDiagram
+  participant App as Edge code
+  participant Out as outbound StreamObserver<br/>IngestEvent
+  participant Net as gRPC channel
+  participant In as server StreamObserver<br/>IngestEvent
+  participant Svc as IngestGrpcService
+  participant Resp as response StreamObserver<br/>AcceptAck
+
+  App->>Out: onNext(event1)
+  Out->>Net: send
+  Net->>In: onNext(event1)
+  In->>Svc: handle event1
+
+  App->>Out: onNext(event2)
+  Out->>Net: send
+  Net->>In: onNext(event2)
+
+  App->>Out: onCompleted()
+  Out->>Net: half-close client stream
+  Net->>In: onCompleted()
+  Svc->>Resp: onNext(AcceptAck)
+  Svc->>Resp: onCompleted()
+  Resp->>Net: send ack
+  Net->>App: listener onNext(ack) then onCompleted()
+
+  Note over App,Resp: onError(t) from either side aborts the RPC

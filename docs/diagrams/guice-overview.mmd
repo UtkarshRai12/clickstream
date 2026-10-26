@@ -1,0 +1,35 @@
+%% Guice dependency injection — general flow + how this edge app uses it
+flowchart TB
+  subgraph boot["1. Boot"]
+    MAIN["main / EdgeServer.start"]
+    MOD["Modules<br/>EdgeModule + EdgeServletModule"]
+    INJ["Injector<br/>Guice.createInjector(...)"]
+    MAIN --> MOD --> INJ
+  end
+
+  subgraph bindings["2. Bindings = the recipe book"]
+    B1["Interface → Impl<br/>TokenIssuer → JwtTokenIssuer"]
+    B2["Class → Instance<br/>ApplicationConfig / Clock"]
+    B3["@Provides method<br/>ApiKeyRepository"]
+    B4["URL → Servlet / Filter<br/>/v1/token → TokenServlet"]
+  end
+
+  subgraph resolve["3. Resolve = build the graph"]
+    GET["injector.getInstance(X)<br/>or @Inject constructor"]
+    CTOR["Guice calls constructors<br/>fills dependencies"]
+    GRAPH["Object graph ready<br/>singletons shared"]
+    GET --> CTOR --> GRAPH
+  end
+
+  subgraph request["4. HTTP request path"]
+    REQ["HTTP request"]
+    GF["GuiceFilter"]
+    AUTH["JwtAuthFilter"]
+    SV["TokenServlet / ReportServlet"]
+    REQ --> GF --> AUTH --> SV
+  end
+
+  INJ --> bindings
+  bindings --> resolve
+  INJ -.->|"GuiceFilter uses injector"| GF
+  GRAPH -.->|"inject into"| SV

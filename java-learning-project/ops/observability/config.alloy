@@ -1,0 +1,36 @@
+// Tails the JSON files the Java processes write under java-learning-project/logs.
+// Those files are mounted at /var/log/clickstream. service is a Loki label.
+// request_id stays in the JSON body. It is not a label, because every call
+// would be a new series.
+
+local.file_match "edge" {
+  path_targets = [{
+    __address__ = "localhost",
+    __path__    = "/var/log/clickstream/edge.json",
+    service     = "edge",
+  }]
+}
+
+local.file_match "server" {
+  path_targets = [{
+    __address__ = "localhost",
+    __path__    = "/var/log/clickstream/server.json",
+    service     = "server",
+  }]
+}
+
+loki.source.file "edge" {
+  targets    = local.file_match.edge.targets
+  forward_to = [loki.write.local.receiver]
+}
+
+loki.source.file "server" {
+  targets    = local.file_match.server.targets
+  forward_to = [loki.write.local.receiver]
+}
+
+loki.write "local" {
+  endpoint {
+    url = "http://127.0.0.1:3100/loki/api/v1/push"
+  }
+}

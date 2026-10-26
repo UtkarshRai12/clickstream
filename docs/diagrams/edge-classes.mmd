@@ -1,0 +1,142 @@
+classDiagram
+  class EdgeMain
+  class EdgeModule
+  class EdgeServletModule
+  EdgeMain --> EdgeModule
+  EdgeModule --> EdgeServletModule
+
+  class RequestIdFilter {
+    +doFilter()
+  }
+  class JwtAuthFilter {
+    +doFilter()
+  }
+  class TokenServlet {
+    +doPost()
+  }
+  class SingleEventServlet {
+    +doPost()
+  }
+  class BatchEventServlet {
+    +doPost()
+  }
+  class ReportServlet {
+    +doGet()
+  }
+
+  class ApiKeyRepository {
+    <<interface>>
+    +find(secret) Optional~ApiKey~
+  }
+  class ConfigApiKeyRepository
+  class ApiKeyVerifier {
+    +verify(header) ApiKey
+  }
+  class TokenIssuer {
+    <<interface>>
+    +issue(key, scope) AccessToken
+  }
+  class JwtTokenIssuer
+  class TokenVerifier {
+    <<interface>>
+    +verify(bearer) Caller
+  }
+  class JwtTokenVerifier
+  class ApiKey {
+    +keyId
+    +tenantId
+    +secretHash
+    +scopes
+  }
+  class AccessToken {
+    +token
+    +expiresInSeconds
+    +scope
+  }
+  class Caller {
+    +keyId
+    +tenantId
+    +scope
+  }
+  class Scope {
+    <<enumeration>>
+    INGEST
+    REPORT
+  }
+
+  class IncomingEvent {
+    +eventId
+    +userId
+    +eventType
+    +occurredAt
+    +properties
+  }
+  class EventBatch {
+    +events
+  }
+  class EventValidator {
+    +validateOne(event)
+    +validateBatch(batch)
+  }
+  class AcceptedEventQueue {
+    +offer(tenantId, batch) boolean
+  }
+  class IngestDispatcher {
+    +start()
+    +close()
+  }
+  class IngestClient {
+    <<interface>>
+    +accept(tenantId, requestId, batch)
+  }
+  class GrpcIngestClient
+  class ReportQuery {
+    +from
+    +to
+    +userId
+    +limit
+    +cursor
+  }
+  class ReportPage {
+    +rows
+    +nextCursor
+  }
+  class ReportClient {
+    <<interface>>
+    +daily(caller, query) ReportPage
+  }
+  class GrpcReportClient
+  class ClientTraceInterceptor {
+    +interceptCall()
+  }
+  class EdgeMetrics {
+    +accepted
+    +rejected
+    +queueDepth
+    +grpcLatency
+  }
+
+  ApiKeyRepository <|.. ConfigApiKeyRepository
+  TokenIssuer <|.. JwtTokenIssuer
+  TokenVerifier <|.. JwtTokenVerifier
+  IngestClient <|.. GrpcIngestClient
+  ReportClient <|.. GrpcReportClient
+
+  TokenServlet --> ApiKeyVerifier
+  TokenServlet --> TokenIssuer
+  ApiKeyVerifier --> ApiKeyRepository
+  JwtAuthFilter --> TokenVerifier
+  TokenVerifier --> Caller
+
+  SingleEventServlet --> EventValidator
+  SingleEventServlet --> AcceptedEventQueue
+  BatchEventServlet --> EventValidator
+  BatchEventServlet --> AcceptedEventQueue
+  IngestDispatcher --> AcceptedEventQueue
+  IngestDispatcher --> IngestClient
+  GrpcIngestClient --> ClientTraceInterceptor
+
+  ReportServlet --> ReportClient
+  GrpcReportClient --> ClientTraceInterceptor
+  SingleEventServlet --> EdgeMetrics
+  IngestDispatcher --> EdgeMetrics
