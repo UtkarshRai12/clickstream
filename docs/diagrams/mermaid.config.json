@@ -1,0 +1,8 @@
+{
+  "htmlLabels": false,
+  "fontFamily": "Arial, sans-serif",
+  "theme": "default",
+  "flowchart": {
+    "padding": 12
+  }
+}

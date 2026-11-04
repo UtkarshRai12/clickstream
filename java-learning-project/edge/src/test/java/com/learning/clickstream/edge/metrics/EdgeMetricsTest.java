@@ -29,6 +29,9 @@ class EdgeMetricsTest {
     assertTrue(metrics.exposes("clickstream_tokens_issued_total"));
     assertTrue(metrics.exposes("clickstream_token_rejections_total"));
     assertTrue(metrics.exposes("clickstream_ingest_queue_depth"));
+    assertTrue(metrics.exposes("clickstream_grpc_forward_seconds"));
+    assertTrue(metrics.exposes("clickstream_grpc_forward_total"));
+    assertTrue(metrics.exposes("clickstream_grpc_batches_dropped_total"));
     assertEquals(1, queue.size());
   }
 

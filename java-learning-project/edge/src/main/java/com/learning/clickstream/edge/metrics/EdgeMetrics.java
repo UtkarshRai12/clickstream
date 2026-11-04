@@ -5,6 +5,7 @@ import com.google.inject.Singleton;
 import com.learning.clickstream.edge.ingest.AcceptedEventQueue;
 import io.prometheus.metrics.core.metrics.Counter;
 import io.prometheus.metrics.core.metrics.GaugeWithCallback;
+import io.prometheus.metrics.core.metrics.Histogram;
 import io.prometheus.metrics.exporter.httpserver.HTTPServer;
 import io.prometheus.metrics.model.registry.PrometheusRegistry;
 import io.prometheus.metrics.model.snapshots.MetricSnapshot;
@@ -12,8 +13,9 @@ import java.io.IOException;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Counters for the public HTTP edge. The registry is private to this process
- * start, so a second test in the same JVM does not collide on the metric name.
+ * Counters for the public HTTP edge, plus the Accept RPC to the ingest server.
+ * The registry is private to this process start, so a second test in the same
+ * JVM does not collide on the metric name.
  *
  * The scrape port is a separate HTTP server. It is not a servlet, so the JWT
  * filter cannot sit in front of Prometheus.
@@ -26,6 +28,9 @@ public final class EdgeMetrics implements AutoCloseable {
   private final Counter rejected;
   private final Counter tokensIssued;
   private final Counter tokenRejected;
+  private final Histogram grpcForwardSeconds;
+  private final Counter grpcForward;
+  private final Counter grpcDropped;
   private HTTPServer http;
 
   @Inject
@@ -49,6 +54,19 @@ public final class EdgeMetrics implements AutoCloseable {
         .help("POST /v1/token calls that did not return a JWT. The label is the HTTP status.")
         .labelNames("code")
         .build();
+    // Same bounds as the server stream-load histogram, so one Grafana heatmap style fits both.
+    grpcForwardSeconds = histogram(
+        "clickstream_grpc_forward_seconds",
+        "Seconds spent in one Accept RPC, success or failure.");
+    grpcForward = Counter.builder()
+        .name("clickstream_grpc_forward_total")
+        .help("Accept RPCs the edge finished. result is ok or error. code is the gRPC status.")
+        .labelNames("result", "code")
+        .build();
+    grpcDropped = Counter.builder()
+        .name("clickstream_grpc_batches_dropped_total")
+        .help("Batches the dispatcher gave up on. These events are not sent again.")
+        .build();
     // Read at scrape time so the number matches the queue, not a stale copy.
     GaugeWithCallback.builder()
         .name("clickstream_ingest_queue_depth")
@@ -59,6 +77,24 @@ public final class EdgeMetrics implements AutoCloseable {
     registry.register(rejected);
     registry.register(tokensIssued);
     registry.register(tokenRejected);
+    registry.register(grpcForwardSeconds);
+    registry.register(grpcForward);
+    registry.register(grpcDropped);
+  }
+
+  /**
+   * One finished Accept call, including a retry and a failure.
+   * The dispatcher starts the clock immediately before {@code client.accept}.
+   */
+  public void recordForward(long startedNanos, boolean ok, String code) {
+    double seconds = (System.nanoTime() - startedNanos) / 1_000_000_000.0;
+    grpcForwardSeconds.observe(seconds);
+    grpcForward.labelValues(ok ? "ok" : "error", code).inc();
+  }
+
+  /** One abandoned batch. The failed tries were already counted by {@link #recordForward}. */
+  public void recordDropped() {
+    grpcDropped.inc();
   }
 
   public void accepted(int events) {
@@ -108,6 +144,15 @@ public final class EdgeMetrics implements AutoCloseable {
       }
     }
     return false;
+  }
+
+  private static Histogram histogram(String name, String help) {
+    return Histogram.builder()
+        .name(name)
+        .help(help)
+        .classicOnly()
+        .classicUpperBounds(0.01, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10)
+        .build();
   }
 
   @Override
