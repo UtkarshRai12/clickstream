@@ -5,6 +5,9 @@ target/
 # JSON logs written at runtime. Alloy reads this directory. Do not commit it.
 logs/
 
+# SQLite file written by the ingress agent. Reports stay on this machine.
+data/
+
 # Local secrets. api-keys.csv comments hold the plaintext keys.
 # application.properties holds jwt.hmac-secret and internal.token.
 config/api-keys.csv

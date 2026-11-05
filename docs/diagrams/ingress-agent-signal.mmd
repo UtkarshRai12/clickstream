@@ -1,0 +1,18 @@
+%% One signal. Queue, error ratio, drops, and mean latency each have their own copy.
+stateDiagram-v2
+  [*] --> Under
+  Under --> Opened: rises and cooldown has elapsed
+  Under --> Held: rises during cooldown
+  Opened --> Under: falls below the threshold
+  Held --> Under: falls below the threshold
+  Opened --> Opened: stays at or above
+  Held --> Held: stays at or above
+
+  note right of Opened
+    This crossing stored one report.
+    Staying hot does not store another.
+  end note
+  note right of Held
+    The rise was real, but the last report
+    for this signal is still inside 120s.
+  end note

@@ -1,0 +1,59 @@
+classDiagram
+  class IngressTriggers {
+    +QUEUE_DEPTH
+    +ERROR_RATIO
+    +MIN_ATTEMPTS
+    +WINDOW_ATTEMPTS
+    +DROPPED_BATCHES
+    +MEAN_SECONDS
+  }
+  class HopGate {
+    +onForward(ok, code, seconds, queueDepth)
+    +onDrop(queueDepth)
+  }
+  class AgentNotifier {
+    +submit(snapshot)
+  }
+  class IngestDispatcher
+
+  class AgentServer {
+    +start(config, writer)
+    +port() int
+    +close()
+  }
+  class IncidentService {
+    +open(snapshot) StoredReport
+    +followUp(id, question) ChatMessage
+  }
+  class IncidentWriter {
+    <<interface>>
+    +modelName() String
+    +writeReport(snapshot) String
+    +answer(query) String
+  }
+  class LocalIncidentWriter
+  class LlmIncidentWriter
+  class ReportStore {
+    +insert(report) StoredReport
+    +list() List
+    +find(id) StoredReport
+    +append(id, role, content) ChatMessage
+  }
+  class LangfuseExporter {
+    +export(spans)
+  }
+  class ReportsServlet
+
+  IncidentWriter <|.. LocalIncidentWriter
+  IncidentWriter <|.. LlmIncidentWriter
+
+  IngestDispatcher --> HopGate
+  HopGate --> IngressTriggers
+  HopGate --> AgentNotifier
+  AgentNotifier --> ReportsServlet
+  AgentServer --> IncidentService
+  AgentServer --> ReportsServlet
+  ReportsServlet --> IncidentService
+  IncidentService --> IncidentWriter
+  IncidentService --> ReportStore
+  IncidentService --> LangfuseExporter

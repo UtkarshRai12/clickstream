@@ -1,0 +1,19 @@
+erDiagram
+  reports ||--o{ messages : contains
+  reports {
+    text id PK
+    text created_at
+    text triggers
+    text snapshot_json
+    text body
+    text model
+    text trace_id
+    text root_span_id
+  }
+  messages {
+    integer id PK
+    text report_id FK
+    text role
+    text content
+    text created_at
+  }

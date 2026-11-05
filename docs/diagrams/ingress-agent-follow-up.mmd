@@ -1,0 +1,15 @@
+%% Follow-up uses the stored snapshot. It does not open a report and it does not poll.
+sequenceDiagram
+  participant Browser
+  participant API as ReportsServlet
+  participant DB as ReportStore
+  participant Writer as IncidentWriter
+  participant LF as LangfuseExporter
+
+  Browser->>API: POST /api/reports/{id}/messages
+  API->>DB: load report, snapshot, and messages
+  API->>Writer: answer(report, history, question)
+  Writer-->>API: answer
+  API->>DB: append user message, then assistant message
+  API->>LF: export a generation under the stored trace
+  API-->>Browser: assistant message

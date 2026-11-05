@@ -1,0 +1,22 @@
+%% The agent does not poll. The edge calls it when a hardcoded trigger is crossed.
+flowchart LR
+  collector[Collector]
+  edge["Edge HTTP<br/>127.0.0.1"]
+  queue["Accepted<br/>EventQueue"]
+  dispatcher["Ingest<br/>Dispatcher"]
+  gate["HopGate<br/>hardcoded triggers"]
+  server["Ingest server<br/>gRPC"]
+  agent["Agent<br/>:8095"]
+  db[(SQLite reports)]
+  langfuse["Langfuse<br/>OTLP"]
+  browser[Browser]
+
+  collector --> edge
+  edge --> queue
+  queue --> dispatcher
+  dispatcher --> server
+  dispatcher --> gate
+  gate -->|POST when crossed| agent
+  agent --> db
+  agent --> langfuse
+  browser --> agent

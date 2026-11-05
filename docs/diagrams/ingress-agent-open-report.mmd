@@ -1,0 +1,20 @@
+%% The dispatcher already ran. The gate compares that result to constants.
+sequenceDiagram
+  participant Disp as IngestDispatcher
+  participant Gate as HopGate
+  participant Notify as AgentNotifier
+  participant Svc as IncidentService
+  participant Writer as IncidentWriter
+  participant DB as ReportStore
+  participant LF as LangfuseExporter
+
+  Disp->>Gate: one accept result, or one drop, or the queue depth
+  Gate->>Gate: compare with IngressTriggers
+  Note over Gate: rising edge only. Still hot does not fire again.
+  Gate->>Notify: snapshot
+  Notify->>Svc: POST /api/incidents
+  Svc->>Writer: writeReport(snapshot)
+  Writer-->>Svc: report body
+  Svc->>DB: insert report and first assistant message
+  Svc->>LF: export agent and generation spans
+  Note over LF,DB: a failed export does not delete the report
