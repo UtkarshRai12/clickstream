@@ -45,6 +45,16 @@ public final class IncidentService {
     this.clock = clock;
   }
 
+  /** Newest first. The page uses this for the list and does not poll. */
+  public List<ReportSummary> list() {
+    return store.list();
+  }
+
+  /** Empty when the id is unknown. The servlet turns that into 404. */
+  public Optional<StoredReport> find(String id) {
+    return store.find(id);
+  }
+
   /** Writes the report and the first assistant message, then exports the root and the child. */
   public StoredReport open(IncidentSnapshot snapshot) {
     Written written = write(snapshot);

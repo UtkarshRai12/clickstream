@@ -26,6 +26,7 @@ public final class IngestDispatcher implements AutoCloseable {
   private final IngestClient client;
   private final EdgeMetrics metrics;
   private final HopGate gate;
+  private final AgentNotifier notifier;
   private volatile boolean running;
   private Thread thread;
 
@@ -91,9 +92,15 @@ public final class IngestDispatcher implements AutoCloseable {
     }
   }
 
-  /** Part 2 returns the snapshot. Nothing posts it until the agent exists. */
+  /**
+   * Logs the crossing and hands the snapshot to the notifier.
+   * {@code submit} returns immediately. This thread does not wait for the agent.
+   */
   private void note(Optional<Snapshot> snapshot) {
-    snapshot.ifPresent(s -> log.warn("ingress threshold crossed reasons={}", s.reasons()));
+    snapshot.ifPresent(s -> {
+      log.warn("ingress threshold crossed reasons={}", s.reasons());
+      notifier.submit(s);
+    });
   }
 
   /** A drop and another signal on the same call are one snapshot. */
@@ -132,5 +139,6 @@ public final class IngestDispatcher implements AutoCloseable {
         Thread.currentThread().interrupt();
       }
     }
+    notifier.close();
   }
 }

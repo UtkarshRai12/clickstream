@@ -29,7 +29,10 @@ class HopMetricsTest {
       calls.incrementAndGet();
       throw Status.UNAVAILABLE.withDescription("down").asRuntimeException();
     };
-    IngestDispatcher dispatcher = new IngestDispatcher(queue, client, metrics, new HopGate(Clock.systemUTC()));
+    // The drop crosses a trigger. Point the notifier at a closed port so the test does not wait on 8095.
+    IngestDispatcher dispatcher = new IngestDispatcher(
+        queue, client, metrics, new HopGate(Clock.systemUTC()),
+        new AgentNotifier(URI.create("http://127.0.0.1:9/api/incidents")));
     queue.offer(new QueuedBatch("tenant-a", "req-1", List.of(event())));
     dispatcher.start();
     try {
