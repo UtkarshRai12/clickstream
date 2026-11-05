@@ -57,18 +57,24 @@ public final class IncidentService {
 
   /** Writes the report and the first assistant message, then exports the root and the child. */
   public StoredReport open(IncidentSnapshot snapshot) {
+    // The root span covers the write and the insert. The child covers only the writer call.
+    Instant started = clock.instant();
     Written written = write(snapshot);
+    Instant writtenAt = clock.instant();
     String id = UUID.randomUUID().toString();
     String traceId = hex(32);
     String rootSpanId = hex(16);
     String snapshotJson = toJson(snapshot);
     StoredReport report = store.insert(
-        id, clock.instant(), snapshot.reasons(), snapshotJson, written.body, written.model, traceId, rootSpanId);
+        id, writtenAt, snapshot.reasons(), snapshotJson, written.body, written.model, traceId, rootSpanId);
+    Instant stored = clock.instant();
     String prompt = prompt(snapshotJson, null);
     export(id, List.of(
-        Observation.agent(traceId, rootSpanId, id, written.model, snapshotJson, written.body),
+        Observation.agent(
+            traceId, rootSpanId, id, written.model, snapshotJson, written.body, started, stored),
         Observation.generation(
-            traceId, hex(16), rootSpanId, id, Observation.WRITE_REPORT, written.model, prompt, written.body)));
+            traceId, hex(16), rootSpanId, id, Observation.WRITE_REPORT, written.model, prompt,
+            written.body, started, writtenAt)));
     return report;
   }
 
@@ -84,6 +90,7 @@ public final class IncidentService {
     StoredReport report = found.get();
     IncidentSnapshot snapshot = fromJson(report.snapshotJson());
     FollowUpQuery query = new FollowUpQuery(snapshot, report.body(), last(report.messages()), question);
+    Instant started = clock.instant();
     Written written = answer(query);
     Instant now = clock.instant();
     store.append(id, "user", question, now);
@@ -96,7 +103,9 @@ public final class IncidentService {
         Observation.FOLLOW_UP,
         written.model,
         prompt(report.snapshotJson(), question),
-        written.body)));
+        written.body,
+        started,
+        now)));
     return Optional.of(assistant);
   }
 

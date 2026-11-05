@@ -23,12 +23,15 @@ public final class AgentServer implements AutoCloseable {
     this.port = port;
   }
 
-  /** A local writer and an exporter that drops spans. Boot uses this until a key exists. */
+  /**
+   * A local writer and the Langfuse exporter from the environment.
+   * With blank Langfuse keys the exporter sends nothing and the page still works.
+   */
   public static AgentServer start(Path database, int port) {
     IncidentService service = new IncidentService(
         new ReportStore(database),
         new LocalIncidentWriter(),
-        spans -> { },
+        LangfuseExporter.fromEnv(System.getenv()),
         Clock.systemUTC());
     return start(service, port);
   }
