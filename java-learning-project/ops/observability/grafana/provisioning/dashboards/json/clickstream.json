@@ -68,7 +68,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "{service=~\"edge|server\"} | json request_id=\"mdc.request_id\", tenant_id=\"mdc.tenant_id\", route=\"mdc.route\", logger=\"loggerName\""
+          "expr": "{service=~\"edge|server|agent\"} | json request_id=\"mdc.request_id\", tenant_id=\"mdc.tenant_id\", route=\"mdc.route\", logger=\"loggerName\""
         }
       ]
     }

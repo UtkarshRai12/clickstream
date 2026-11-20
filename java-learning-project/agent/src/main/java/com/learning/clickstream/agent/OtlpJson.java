@@ -59,11 +59,32 @@ final class OtlpJson {
     if (Observation.GENERATION.equals(span.type()) && span.model() != null) {
       attrs.add(attr("langfuse.observation.model.name", span.model()));
     }
+    // One attribute per key. Langfuse reads the suffix as observation metadata.
+    for (Map.Entry<String, String> entry : span.metadata().entrySet()) {
+      attrs.add(attr("langfuse.observation.metadata." + entry.getKey(), entry.getValue()));
+    }
+    if (Observation.GENERATION.equals(span.type()) && span.inputTokens() != null) {
+      int output = span.outputTokens() == null ? 0 : span.outputTokens();
+      attrs.add(attr(
+          "langfuse.observation.usage_details",
+          "{\"input\":" + span.inputTokens() + ",\"output\":" + output + "}"));
+    }
+    if (span.promptName() != null) {
+      attrs.add(attr("langfuse.observation.prompt.name", span.promptName()));
+      if (span.promptVersion() != null) {
+        attrs.add(attrInt("langfuse.observation.prompt.version", span.promptVersion()));
+      }
+    }
     return attrs;
   }
 
   private static Map<String, Object> attr(String key, String value) {
     return Map.of("key", key, "value", Map.of("stringValue", value == null ? "" : value));
+  }
+
+  /** Prompt versions are integers. A string would not link the generation to the prompt. */
+  private static Map<String, Object> attrInt(String key, int value) {
+    return Map.of("key", key, "value", Map.of("intValue", value));
   }
 
   /** A string, because a 64-bit nano count does not fit a JSON number safely. */

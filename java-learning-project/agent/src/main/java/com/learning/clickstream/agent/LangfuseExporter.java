@@ -33,7 +33,13 @@ public final class LangfuseExporter implements TraceExporter {
     this.endpoint = URI.create(trimSlash(host) + PATH);
     String pair = publicKey + ":" + secretKey;
     this.authorization = "Basic " + Base64.getEncoder().encodeToString(pair.getBytes(StandardCharsets.UTF_8));
-    this.client = HttpClient.newBuilder().connectTimeout(TIMEOUT).build();
+    // Langfuse is plain HTTP. The JDK client defaults to HTTP/2 and sends an
+    // h2c upgrade. Next.js closes that connection with no bytes, so the POST
+    // never becomes a trace. Pin HTTP/1.1.
+    this.client = HttpClient.newBuilder()
+        .version(HttpClient.Version.HTTP_1_1)
+        .connectTimeout(TIMEOUT)
+        .build();
   }
 
   /** Reads LANGFUSE_HOST, LANGFUSE_PUBLIC_KEY, and LANGFUSE_SECRET_KEY. */

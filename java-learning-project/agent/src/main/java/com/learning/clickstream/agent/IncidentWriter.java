@@ -2,10 +2,10 @@ package com.learning.clickstream.agent;
 
 /** Turns a snapshot into report text, and a follow-up into an answer. */
 public interface IncidentWriter {
-  /** Stored in the report's model column. {@code local} means no model was called. */
+  /** Stored in the report's model column when this writer produced the text. */
   String modelName();
 
-  String writeReport(IncidentSnapshot snapshot);
+  WriterResult writeReport(IncidentSnapshot snapshot);
 
-  String answer(FollowUpQuery query);
+  WriterResult answer(FollowUpQuery query);
 }

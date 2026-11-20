@@ -66,6 +66,9 @@ class LangfuseExporterTest {
     assertEquals("generation", attr(child, "langfuse.observation.type"));
     assertEquals("write-report", child.path("name").asText());
     assertEquals("local", attr(child, "langfuse.observation.model.name"));
+    // The template spends no tokens, so the usage attribute is left off.
+    assertEquals(null, attr(child, "langfuse.observation.usage_details"));
+    assertEquals("none", attr(root, "langfuse.observation.metadata.guardrail"));
 
     assertEquals(report.traceId(), root.path("traceId").asText());
     assertEquals(report.traceId(), child.path("traceId").asText());

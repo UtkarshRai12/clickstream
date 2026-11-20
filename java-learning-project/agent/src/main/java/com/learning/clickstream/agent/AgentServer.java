@@ -28,21 +28,30 @@ public final class AgentServer implements AutoCloseable {
 
   /**
    * The writer and the Langfuse exporter come from the environment.
-   * No Gemini key means the local writer. Blank Langfuse keys send nothing.
-   * Step 8: the model name, base URL, timeout, port, and database path now come
-   * from agent.properties (or their env overrides) instead of constants.
+   * A Cloud project means the Gemini platform. No project and no Gemini key
+   * means the local writer. Blank Langfuse keys send nothing.
+   * The model name, base URL, timeout, project, location, port, and database
+   * path come from agent.properties (or their env overrides).
    */
   public static AgentServer start(AgentConfig config, Map<String, String> env) {
     String apiKey = IncidentWriters.apiKey(env);
-    IncidentWriter writer = IncidentWriters.create(
-        apiKey, config.modelName(), config.modelBaseUrl(), config.modelTimeout(), 2);
+    IncidentWriters.Running running = IncidentWriters.running(
+        apiKey,
+        config.modelName(),
+        config.modelBaseUrl(),
+        config.modelTimeout(),
+        2,
+        config.gcpProject(),
+        config.gcpLocation(),
+        env);
     // Say which writer and exporter are live, so a missing key is obvious at boot.
-    log.info("writer={} langfuse={}", writer.modelName(), blank(env.get("LANGFUSE_PUBLIC_KEY")) ? "off" : "on");
+    log.info("writer={} langfuse={}", running.writer().modelName(), blank(env.get("LANGFUSE_PUBLIC_KEY")) ? "off" : "on");
     IncidentService service = new IncidentService(
         new ReportStore(config.dbPath()),
-        writer,
+        running.writer(),
         LangfuseExporter.fromEnv(env),
-        Clock.systemUTC());
+        Clock.systemUTC(),
+        running.topics());
     return start(service, config.httpPort());
   }
 

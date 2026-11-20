@@ -48,10 +48,10 @@ class LlmIncidentWriterTest {
 
     StoredReport report = service.open(SNAPSHOT);
 
-    assertEquals("gemini-2.5-flash", report.model());
+    assertEquals(IncidentWriters.DEFAULT_MODEL, report.model());
     assertEquals("Five of the last 20 Accept calls failed with UNAVAILABLE.", report.body());
     Captured first = requests.get(0);
-    assertTrue(first.path.endsWith("/models/gemini-2.5-flash:generateContent"), first.path);
+    assertTrue(first.path.endsWith("/models/" + IncidentWriters.DEFAULT_MODEL + ":generateContent"), first.path);
     assertEquals("test-key", first.apiKey);
     assertTrue(first.body.contains("queueDepth"), first.body);
     assertTrue(first.body.contains(REASON), first.body);
@@ -70,6 +70,18 @@ class LlmIncidentWriterTest {
   }
 
   @Test
+  void tokenCountsComeBackWithTheText() throws Exception {
+    String baseUrl = startStub(200, "Five of the last 20 Accept calls failed with UNAVAILABLE.");
+    IncidentWriter writer = IncidentWriters.create(
+        "test-key", IncidentWriters.DEFAULT_MODEL, baseUrl, Duration.ofSeconds(5), 0);
+
+    WriterResult result = writer.writeReport(SNAPSHOT);
+
+    assertEquals(10, result.inputTokens());
+    assertEquals(5, result.outputTokens());
+  }
+
+  @Test
   void aGeminiErrorFallsBackToTheLocalReport() throws Exception {
     String baseUrl = startStub(500, "unused");
     IncidentService service = service(baseUrl);
@@ -77,7 +89,7 @@ class LlmIncidentWriterTest {
     StoredReport report = service.open(SNAPSHOT);
 
     assertEquals("local", report.model());
-    assertEquals(new LocalIncidentWriter().writeReport(SNAPSHOT), report.body());
+    assertEquals(new LocalIncidentWriter().writeReport(SNAPSHOT).text(), report.body());
   }
 
   @Test
@@ -102,7 +114,7 @@ class LlmIncidentWriterTest {
     String body = """
         {"candidates":[{"content":{"role":"model","parts":[{"text":"%s"}]},"finishReason":"STOP","index":0}],
          "usageMetadata":{"promptTokenCount":10,"candidatesTokenCount":5,"totalTokenCount":15},
-         "modelVersion":"gemini-2.5-flash"}
+         "modelVersion":"gemini-3.6-flash"}
         """.formatted(text);
     byte[] bytes = (status == 200 ? body : "{\"error\":{\"code\":500,\"message\":\"boom\"}}")
         .getBytes(StandardCharsets.UTF_8);

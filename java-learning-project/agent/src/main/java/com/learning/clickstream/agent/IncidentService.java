@@ -1,10 +1,6 @@
 package com.learning.clickstream.agent;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import java.io.IOException;
-import java.io.UncheckedIOException;
+import com.learning.clickstream.agent.guard.TopicGuard;
 import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Instant;
@@ -20,29 +16,28 @@ import org.slf4j.LoggerFactory;
  * snapshot. The trace is exported only after the row is committed.
  */
 public final class IncidentService {
-  /** One stored turn. Longer model output is cut so a row cannot grow without a bound. */
-  static final int BODY_CAP = 16_000;
-
-  /** A later turn can drift. The writer sees this many recent messages, plus the new question. */
-  static final int HISTORY = 20;
-
   private static final Logger log = LoggerFactory.getLogger(IncidentService.class);
-  private static final ObjectMapper JSON = new ObjectMapper()
-      .registerModule(new JavaTimeModule())
-      .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
   private final ReportStore store;
   private final IncidentWriter writer;
   private final LocalIncidentWriter local = new LocalIncidentWriter();
   private final TraceExporter exporter;
   private final Clock clock;
+  private final TopicGuard topics;
   private final SecureRandom random = new SecureRandom();
 
+  /** Tests that are not about topics. Every follow-up is allowed. */
   public IncidentService(ReportStore store, IncidentWriter writer, TraceExporter exporter, Clock clock) {
+    this(store, writer, exporter, clock, TopicGuard.allowAll());
+  }
+
+  public IncidentService(
+      ReportStore store, IncidentWriter writer, TraceExporter exporter, Clock clock, TopicGuard topics) {
     this.store = store;
     this.writer = writer;
     this.exporter = exporter;
     this.clock = clock;
+    this.topics = topics;
   }
 
   /** Newest first. The page uses this for the list and does not poll. */
@@ -64,17 +59,21 @@ public final class IncidentService {
     String id = UUID.randomUUID().toString();
     String traceId = hex(32);
     String rootSpanId = hex(16);
-    String snapshotJson = toJson(snapshot);
+    String snapshotJson = IncidentText.toJson(snapshot);
     StoredReport report = store.insert(
         id, writtenAt, snapshot.reasons(), snapshotJson, written.body, written.model, traceId, rootSpanId);
     Instant stored = clock.instant();
-    String prompt = prompt(snapshotJson, null);
+    String prompt = IncidentText.prompt(snapshotJson, null);
+    // The row says "local" when the guardrail swapped the text. The span still
+    // names the model that was billed, so the tokens have a price.
     export(id, List.of(
         Observation.agent(
-            traceId, rootSpanId, id, written.model, snapshotJson, written.body, started, stored),
+            traceId, rootSpanId, id, written.model, snapshotJson, written.body, started, stored,
+            written.guardrail),
         Observation.generation(
-            traceId, hex(16), rootSpanId, id, Observation.WRITE_REPORT, written.model, prompt,
-            written.body, started, writtenAt)));
+            traceId, hex(16), rootSpanId, id, Observation.WRITE_REPORT, spanModel(written), prompt,
+            written.body, started, writtenAt, written.inputTokens, written.outputTokens,
+            written.promptName, written.promptVersion, null)));
     return report;
   }
 
@@ -88,8 +87,12 @@ public final class IncidentService {
       return Optional.empty();
     }
     StoredReport report = found.get();
-    IncidentSnapshot snapshot = fromJson(report.snapshotJson());
-    FollowUpQuery query = new FollowUpQuery(snapshot, report.body(), last(report.messages()), question);
+    // Off topic never reaches the writer. The refusal is still stored.
+    if (!topics.allows(question)) {
+      return refuse(id, report, question);
+    }
+    IncidentSnapshot snapshot = IncidentText.fromJson(report.snapshotJson());
+    FollowUpQuery query = new FollowUpQuery(snapshot, report.body(), IncidentText.last(report.messages()), question);
     Instant started = clock.instant();
     Written written = answer(query);
     Instant now = clock.instant();
@@ -101,37 +104,68 @@ public final class IncidentService {
         report.rootSpanId(),
         id,
         Observation.FOLLOW_UP,
-        written.model,
-        prompt(report.snapshotJson(), question),
+        spanModel(written),
+        IncidentText.prompt(report.snapshotJson(), question),
         written.body,
         started,
-        now)));
+        now,
+        written.inputTokens,
+        written.outputTokens,
+        written.promptName,
+        written.promptVersion,
+        written.guardrail)));
+    return Optional.of(assistant);
+  }
+
+  private Optional<ChatMessage> refuse(String id, StoredReport report, String question) {
+    Instant now = clock.instant();
+    store.append(id, "user", question, now);
+    ChatMessage assistant = store.append(id, "assistant", TopicGuard.REFUSAL, now).orElseThrow();
+    export(id, List.of(Observation.refused(
+        report.traceId(), hex(16), report.rootSpanId(), id, question, TopicGuard.REFUSAL, now, now)));
     return Optional.of(assistant);
   }
 
   private Written write(IncidentSnapshot snapshot) {
     try {
-      return new Written(cap(writer.writeReport(snapshot)), writer.modelName());
+      return from(writer.writeReport(snapshot));
     } catch (RuntimeException ex) {
       // A local failure is the last resort, so it propagates and nothing is stored.
       if (writer instanceof LocalIncidentWriter) {
         throw ex;
       }
       log.warn("incident writer failed, storing the local report", ex);
-      return new Written(cap(local.writeReport(snapshot)), local.modelName());
+      return from(local.writeReport(snapshot));
     }
   }
 
   private Written answer(FollowUpQuery query) {
     try {
-      return new Written(cap(writer.answer(query)), writer.modelName());
+      return from(writer.answer(query));
     } catch (RuntimeException ex) {
       if (writer instanceof LocalIncidentWriter) {
         throw ex;
       }
       log.warn("follow-up writer failed, storing the local answer", ex);
-      return new Written(cap(local.answer(query)), local.modelName());
+      return from(local.answer(query));
     }
+  }
+
+  private static Written from(WriterResult result) {
+    return new Written(
+        IncidentText.cap(result.text()),
+        result.model(),
+        result.billedModel(),
+        result.inputTokens(),
+        result.outputTokens(),
+        result.promptName(),
+        result.promptVersion(),
+        result.guardrail());
+  }
+
+  /** The model that spent the tokens. The row model can be "local" after a swap. */
+  private static String spanModel(Written written) {
+    return written.billedModel != null ? written.billedModel : written.model;
   }
 
   /** The export runs after the commit. A sink that throws leaves the row in place. */
@@ -143,47 +177,19 @@ public final class IncidentService {
     }
   }
 
-  private static List<ChatMessage> last(List<ChatMessage> messages) {
-    if (messages.size() <= HISTORY) {
-      return messages;
-    }
-    return List.copyOf(messages.subList(messages.size() - HISTORY, messages.size()));
-  }
-
-  /** The same rule a model would be given. The local writer does not call one. */
-  private static String prompt(String snapshotJson, String question) {
-    String text = "Use only these numbers. Do not invent a cause.\n" + snapshotJson;
-    if (question == null) {
-      return text;
-    }
-    return text + "\nQuestion: " + question;
-  }
-
-  static String cap(String body) {
-    return body.length() <= BODY_CAP ? body : body.substring(0, BODY_CAP);
-  }
-
   private String hex(int chars) {
     byte[] bytes = new byte[chars / 2];
     random.nextBytes(bytes);
     return HexFormat.of().formatHex(bytes);
   }
 
-  private static String toJson(IncidentSnapshot snapshot) {
-    try {
-      return JSON.writeValueAsString(snapshot);
-    } catch (IOException ex) {
-      throw new UncheckedIOException(ex);
-    }
-  }
-
-  private static IncidentSnapshot fromJson(String raw) {
-    try {
-      return JSON.readValue(raw, IncidentSnapshot.class);
-    } catch (IOException ex) {
-      throw new UncheckedIOException(ex);
-    }
-  }
-
-  private record Written(String body, String model) {}
+  private record Written(
+      String body,
+      String model,
+      String billedModel,
+      Integer inputTokens,
+      Integer outputTokens,
+      String promptName,
+      Integer promptVersion,
+      String guardrail) {}
 }

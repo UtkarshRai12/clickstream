@@ -1,6 +1,7 @@
 package com.learning.clickstream.agent;
 
 import java.time.Instant;
+import java.util.Map;
 
 /**
  * One span in an ingress trace. {@link LangfuseExporter} turns these fields
@@ -19,7 +20,12 @@ public record Observation(
     String input,
     String output,
     Instant start,
-    Instant end) {
+    Instant end,
+    Map<String, String> metadata,
+    Integer inputTokens,
+    Integer outputTokens,
+    String promptName,
+    Integer promptVersion) {
 
   static final String TRACE = "ingress-incident";
   static final String WRITE_REPORT = "write-report";
@@ -36,9 +42,11 @@ public record Observation(
       String input,
       String output,
       Instant start,
-      Instant end) {
+      Instant end,
+      String guardrail) {
     return new Observation(
-        TRACE, traceId, spanId, null, sessionId, TRACE, AGENT, model, input, output, start, end);
+        TRACE, traceId, spanId, null, sessionId, TRACE, AGENT, model, input, output, start, end,
+        guard(guardrail), null, null, null, null);
   }
 
   /** A child generation. A follow-up uses the stored root span id as {@code parentSpanId}. */
@@ -52,9 +60,36 @@ public record Observation(
       String input,
       String output,
       Instant start,
-      Instant end) {
+      Instant end,
+      Integer inputTokens,
+      Integer outputTokens,
+      String promptName,
+      Integer promptVersion,
+      String guardrail) {
     return new Observation(
         TRACE, traceId, spanId, parentSpanId, sessionId, name, GENERATION, model, input, output,
-        start, end);
+        start, end, guard(guardrail), inputTokens, outputTokens, promptName, promptVersion);
+  }
+
+  /**
+   * A follow-up that never called the model. Type {@code span}, so Langfuse does
+   * not price it as a generation.
+   */
+  static Observation refused(
+      String traceId,
+      String spanId,
+      String parentSpanId,
+      String sessionId,
+      String input,
+      String output,
+      Instant start,
+      Instant end) {
+    return new Observation(
+        TRACE, traceId, spanId, parentSpanId, sessionId, FOLLOW_UP, "span", null, input, output,
+        start, end, guard("off_topic"), null, null, null, null);
+  }
+
+  private static Map<String, String> guard(String guardrail) {
+    return guardrail == null ? Map.of() : Map.of("guardrail", guardrail);
   }
 }

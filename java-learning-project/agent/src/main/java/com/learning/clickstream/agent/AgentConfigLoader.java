@@ -35,7 +35,9 @@ public final class AgentConfigLoader {
         Path.of(value(props, env, "agent.db.path")),
         value(props, env, "agent.model.base.url"),
         value(props, env, "agent.model.name"),
-        Duration.ofSeconds(number(value(props, env, "agent.model.timeout.seconds"), "agent.model.timeout.seconds")));
+        Duration.ofSeconds(number(value(props, env, "agent.model.timeout.seconds"), "agent.model.timeout.seconds")),
+        value(props, env, "agent.gcp.project"),
+        value(props, env, "agent.gcp.location"));
   }
 
   private static Properties defaults() {
@@ -45,6 +47,9 @@ public final class AgentConfigLoader {
     props.setProperty("agent.model.base.url", "");
     props.setProperty("agent.model.name", IncidentWriters.DEFAULT_MODEL);
     props.setProperty("agent.model.timeout.seconds", "30");
+    // Empty project keeps the AI Studio key path. Current Gemini models use the global endpoint.
+    props.setProperty("agent.gcp.project", "");
+    props.setProperty("agent.gcp.location", "global");
     return props;
   }
 

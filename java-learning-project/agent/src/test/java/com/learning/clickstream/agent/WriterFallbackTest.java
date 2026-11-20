@@ -30,7 +30,7 @@ class WriterFallbackTest {
     StoredReport report = service.open(SNAPSHOT);
 
     assertEquals("local", report.model());
-    assertEquals(new LocalIncidentWriter().writeReport(SNAPSHOT), report.body());
+    assertEquals(new LocalIncidentWriter().writeReport(SNAPSHOT).text(), report.body());
     assertTrue(store.find(report.id()).isPresent());
   }
 
@@ -69,12 +69,12 @@ class WriterFallbackTest {
     }
 
     @Override
-    public String writeReport(IncidentSnapshot snapshot) {
+    public WriterResult writeReport(IncidentSnapshot snapshot) {
       throw new IllegalStateException("model unavailable");
     }
 
     @Override
-    public String answer(FollowUpQuery query) {
+    public WriterResult answer(FollowUpQuery query) {
       throw new IllegalStateException("model unavailable");
     }
   }

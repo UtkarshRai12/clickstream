@@ -162,6 +162,30 @@
         <artifactId>langchain4j-google-ai-gemini</artifactId>
         <version>${langchain4j.version}</version>
       </dependency>
+      <!--
+        Gemini platform (aiplatform.googleapis.com). Stable 1.22.0 does not
+        publish this module. This beta is the 1.22 line and uses the same core.
+      -->
+      <dependency>
+        <groupId>dev.langchain4j</groupId>
+        <artifactId>langchain4j-vertex-ai-gemini</artifactId>
+        <version>1.22.0-beta32</version>
+      </dependency>
+      <!-- EmbeddingModelTextClassifier lives here. The Gemini client does not pull it in. -->
+      <dependency>
+        <groupId>dev.langchain4j</groupId>
+        <artifactId>langchain4j</artifactId>
+        <version>${langchain4j.version}</version>
+      </dependency>
+      <!--
+        Stable 1.22.0 does not publish the MiniLM module. This beta is the 1.22
+        line and it depends on langchain4j-core 1.22.0, the same core as above.
+      -->
+      <dependency>
+        <groupId>dev.langchain4j</groupId>
+        <artifactId>langchain4j-embeddings-all-minilm-l6-v2-q</artifactId>
+        <version>1.22.0-beta32</version>
+      </dependency>
     </dependencies>
   </dependencyManagement>
 

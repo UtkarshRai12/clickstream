@@ -21,8 +21,10 @@ class AgentConfigLoaderTest {
     assertEquals(8095, config.httpPort());
     assertEquals(Path.of("data/ingress-reports.db"), config.dbPath());
     assertEquals("", config.modelBaseUrl());
-    assertEquals("gemini-2.5-flash", config.modelName());
+    assertEquals(IncidentWriters.DEFAULT_MODEL, config.modelName());
     assertEquals(Duration.ofSeconds(30), config.modelTimeout());
+    assertEquals("", config.gcpProject());
+    assertEquals("global", config.gcpLocation());
   }
 
   @Test

@@ -15,8 +15,8 @@ public final class LocalIncidentWriter implements IncidentWriter {
   }
 
   @Override
-  public String writeReport(IncidentSnapshot snapshot) {
-    return """
+  public WriterResult writeReport(IncidentSnapshot snapshot) {
+    return WriterResult.local("""
         The ingress hop crossed a hardcoded trigger.
         %s
 
@@ -30,14 +30,14 @@ public final class LocalIncidentWriter implements IncidentWriter {
         snapshot.failures(),
         snapshot.dropped(),
         mean(snapshot.meanSeconds()),
-        codes(snapshot.errorsByCode()));
+        codes(snapshot.errorsByCode())));
   }
 
   @Override
-  public String answer(FollowUpQuery query) {
+  public WriterResult answer(FollowUpQuery query) {
     // The question is not re-read from the edge. The stored snapshot is the evidence.
     IncidentSnapshot snapshot = query.snapshot();
-    return """
+    return WriterResult.local("""
         Using the stored snapshot only.
         Queue depth %d. Attempts %d, failures %d, dropped %d. Mean Accept time %s seconds. Status codes: %s.
         %s
@@ -48,7 +48,7 @@ public final class LocalIncidentWriter implements IncidentWriter {
         snapshot.dropped(),
         mean(snapshot.meanSeconds()),
         codes(snapshot.errorsByCode()),
-        reasons(snapshot));
+        reasons(snapshot)));
   }
 
   private static String reasons(IncidentSnapshot snapshot) {

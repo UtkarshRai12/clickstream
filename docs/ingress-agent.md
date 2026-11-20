@@ -101,7 +101,7 @@ Reason text is fixed, so both writers quote the same sentence. Examples:
 
 `LocalIncidentWriter` does not call a model. The report restates the reasons, then the queue depth and the ring counts, then two limits: the edge has already returned 202, and this snapshot cannot see Doris or a single tenant. A follow-up answers from that stored snapshot and the messages already on the report. It does not go back to the edge.
 
-`LlmIncidentWriter` sends the same facts to Gemini through LangChain4j 1.22.0 (`GoogleAiGeminiChatModel`, artifact `langchain4j-google-ai-gemini`). The system prompt says to use only those numbers and not to invent a cause. The default model name is `gemini-2.5-flash`. `agent.model.base.url` is optional. Leave it empty and the client uses Google's Gemini endpoint. The API key is read from `GEMINI_API_KEY`, then `GEMINI_AI_KEY`. It is not put in the properties file.
+`LlmIncidentWriter` sends the same facts to Gemini through LangChain4j. When `agent.gcp.project` is set, the client is `VertexAiGeminiChatModel` (`langchain4j-vertex-ai-gemini` 1.22.0-beta32) and the call goes to `aiplatform.googleapis.com`. That client uses Application Default Credentials, not an API key. When the project is empty, the client is `GoogleAiGeminiChatModel` (`langchain4j-google-ai-gemini` 1.22.0) and the call goes to the AI Studio endpoint. The system prompt says to use only those numbers and not to invent a cause. The default model name is `gemini-3.6-flash`. `agent.model.base.url` is optional and only applies to the AI Studio client. The API key is read from `GEMINI_API_KEY`, then `GEMINI_AI_KEY`. It is not put in the properties file.
 
 `IncidentService` catches a failure from the primary writer and stores the local text with `model` set to `local`. If the primary writer already is the local writer, the exception propagates. The body stored for one turn is capped at 16_000 characters.
 
@@ -198,8 +198,10 @@ The agent posts to `http://127.0.0.1:3300/api/public/otel/v1/traces`. If those t
 | `agent.http.port` | `8095` |
 | `agent.db.path` | `data/ingress-reports.db` |
 | `agent.model.base.url` | empty |
-| `agent.model.name` | `gemini-2.5-flash` |
+| `agent.model.name` | `gemini-3.6-flash` |
 | `agent.model.timeout.seconds` | `30` |
+| `agent.gcp.project` | empty (set it to call the Gemini platform) |
+| `agent.gcp.location` | `global` |
 
 The trigger numbers are not in this file. They are the constants in `IngressTriggers`. The edge posts to `http://127.0.0.1:8095/api/incidents`. That URL is a constant on `AgentNotifier`, same host and port as the UI.
 

@@ -4,10 +4,13 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.learning.clickstream.agent.guard.TopicGuard;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.ChatModel;
+import dev.langchain4j.model.chat.response.ChatResponse;
+import dev.langchain4j.model.output.TokenUsage;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -26,7 +29,8 @@ public final class LlmIncidentWriter implements IncidentWriter {
       The edge has already returned 202 for the batches it accepted.
       Say what crossed, quote the counts, and say what to check next.
       Plain text, no markdown headings, under 200 words.
-      """;
+      If the question is not about this report, reply with exactly this sentence: %s
+      """.formatted(TopicGuard.REFUSAL);
 
   private static final ObjectMapper JSON = new ObjectMapper()
       .registerModule(new JavaTimeModule())
@@ -34,10 +38,12 @@ public final class LlmIncidentWriter implements IncidentWriter {
 
   private final ChatModel model;
   private final String modelName;
+  private final PromptSource prompts;
 
-  public LlmIncidentWriter(ChatModel model, String modelName) {
+  public LlmIncidentWriter(ChatModel model, String modelName, PromptSource prompts) {
     this.model = model;
     this.modelName = modelName;
+    this.prompts = prompts;
   }
 
   @Override
@@ -46,13 +52,11 @@ public final class LlmIncidentWriter implements IncidentWriter {
   }
 
   @Override
-  public String writeReport(IncidentSnapshot snapshot) {
-    String text = model.chat(
-        SystemMessage.from(RULES),
-        UserMessage.from("Snapshot JSON:\n" + json(snapshot) + "\n\nWrite the incident report."))
-        .aiMessage()
-        .text();
-    return require(text);
+  public WriterResult writeReport(IncidentSnapshot snapshot) {
+    PromptSource.PromptText rules = prompts.get();
+    return result(rules, model.chat(
+        SystemMessage.from(rules.text()),
+        UserMessage.from("Snapshot JSON:\n" + json(snapshot) + "\n\nWrite the incident report.")));
   }
 
   /**
@@ -60,14 +64,27 @@ public final class LlmIncidentWriter implements IncidentWriter {
    * are the stored chat, then the new question.
    */
   @Override
-  public String answer(FollowUpQuery query) {
+  public WriterResult answer(FollowUpQuery query) {
+    PromptSource.PromptText rules = prompts.get();
     List<dev.langchain4j.data.message.ChatMessage> messages = new ArrayList<>();
-    messages.add(SystemMessage.from(RULES
+    messages.add(SystemMessage.from(rules.text()
         + "\nSnapshot JSON:\n" + json(query.snapshot())
         + "\n\nThe report you wrote:\n" + query.reportText()));
     messages.addAll(history(query.messages()));
     messages.add(UserMessage.from(query.question()));
-    return require(model.chat(messages).aiMessage().text());
+    return result(rules, model.chat(messages));
+  }
+
+  /** Empty text is a failure. Token counts ride along so the span can be priced. */
+  private WriterResult result(PromptSource.PromptText rules, ChatResponse response) {
+    TokenUsage usage = response.tokenUsage();
+    return WriterResult.model(
+        require(response.aiMessage().text()),
+        modelName,
+        usage == null ? null : usage.inputTokenCount(),
+        usage == null ? null : usage.outputTokenCount(),
+        rules.name(),
+        rules.version());
   }
 
   /**

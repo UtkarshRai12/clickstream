@@ -13,4 +13,8 @@ public record AgentConfig(
     Path dbPath,
     String modelBaseUrl,
     String modelName,
-    Duration modelTimeout) {}
+    Duration modelTimeout,
+    // Cloud project for the Gemini platform. Empty means the AI Studio key path.
+    String gcpProject,
+    // Platform location. "global" for current Gemini models. Ignored when gcpProject is empty.
+    String gcpLocation) {}
