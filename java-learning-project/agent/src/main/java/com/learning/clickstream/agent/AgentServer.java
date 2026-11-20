@@ -3,18 +3,21 @@ package com.learning.clickstream.agent;
 import com.learning.clickstream.agent.http.IncidentsServlet;
 import com.learning.clickstream.agent.http.PageServlet;
 import com.learning.clickstream.agent.http.ReportsServlet;
-import java.nio.file.Path;
 import java.time.Clock;
+import java.util.Map;
 import org.eclipse.jetty.ee10.servlet.ServletContextHandler;
 import org.eclipse.jetty.ee10.servlet.ServletHolder;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * The report page and the incident API. Loopback only, same posture as the
  * Grafana port. Tests pass port 0 and read the assigned port back.
  */
 public final class AgentServer implements AutoCloseable {
+  private static final Logger log = LoggerFactory.getLogger(AgentServer.class);
   private final Server server;
   private final int port;
 
@@ -24,16 +27,27 @@ public final class AgentServer implements AutoCloseable {
   }
 
   /**
-   * A local writer and the Langfuse exporter from the environment.
-   * With blank Langfuse keys the exporter sends nothing and the page still works.
+   * The writer and the Langfuse exporter come from the environment.
+   * No Gemini key means the local writer. Blank Langfuse keys send nothing.
+   * Step 8: the model name, base URL, timeout, port, and database path now come
+   * from agent.properties (or their env overrides) instead of constants.
    */
-  public static AgentServer start(Path database, int port) {
+  public static AgentServer start(AgentConfig config, Map<String, String> env) {
+    String apiKey = IncidentWriters.apiKey(env);
+    IncidentWriter writer = IncidentWriters.create(
+        apiKey, config.modelName(), config.modelBaseUrl(), config.modelTimeout(), 2);
+    // Say which writer and exporter are live, so a missing key is obvious at boot.
+    log.info("writer={} langfuse={}", writer.modelName(), blank(env.get("LANGFUSE_PUBLIC_KEY")) ? "off" : "on");
     IncidentService service = new IncidentService(
-        new ReportStore(database),
-        new LocalIncidentWriter(),
-        LangfuseExporter.fromEnv(System.getenv()),
+        new ReportStore(config.dbPath()),
+        writer,
+        LangfuseExporter.fromEnv(env),
         Clock.systemUTC());
-    return start(service, port);
+    return start(service, config.httpPort());
+  }
+
+  private static boolean blank(String value) {
+    return value == null || value.isBlank();
   }
 
   public static AgentServer start(IncidentService service, int port) {
@@ -61,6 +75,11 @@ public final class AgentServer implements AutoCloseable {
 
   public int port() {
     return port;
+  }
+
+  /** Blocks the main thread until Jetty stops. The shutdown hook stops it on Ctrl+C. */
+  public void join() throws InterruptedException {
+    server.join();
   }
 
   @Override

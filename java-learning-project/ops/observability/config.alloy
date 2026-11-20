@@ -19,6 +19,20 @@ local.file_match "server" {
   }]
 }
 
+// The ingress agent's file. Same JSON shape as the edge.
+local.file_match "agent" {
+  path_targets = [{
+    __address__ = "localhost",
+    __path__    = "/var/log/clickstream/agent.json",
+    service     = "agent",
+  }]
+}
+
+loki.source.file "agent" {
+  targets    = local.file_match.agent.targets
+  forward_to = [loki.write.local.receiver]
+}
+
 loki.source.file "edge" {
   targets    = local.file_match.edge.targets
   forward_to = [loki.write.local.receiver]

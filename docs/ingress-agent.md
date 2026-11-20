@@ -210,7 +210,18 @@ The trigger numbers are not in this file. They are the constants in `IngressTrig
 From `java-learning-project`:
 
 ```text
-mvn -pl agent -am exec:java -Dexec.mainClass=com.learning.clickstream.agent.AgentMain
+set -a; . config/agent.env; set +a     # optional: Gemini and Langfuse keys
+mvn -pl agent install -DskipTests      # once, or after code changes
+mvn -pl agent exec:java
+```
+
+The main class is set in `agent/pom.xml`. There is no `-am`, because the agent has no reactor dependencies and `-am` would also run `exec:java` in the parent pom.
+
+Langfuse runs from its own compose file. `ops/langfuse/make-env.sh` writes `ops/langfuse/.env` (container secrets plus the project pk/sk) and `config/agent.env` (the same pk/sk, `LANGFUSE_HOST`, and an empty `GEMINI_API_KEY`). Both files are gitignored. Langfuse's headless init creates the org, project, user, and key pair on first boot, so there is no UI step for keys.
+
+```text
+ops/langfuse/make-env.sh
+docker compose -f ops/langfuse/docker-compose.yml up -d    # UI at http://127.0.0.1:3300
 ```
 
 The agent can start with an empty list. A report appears only after the edge crosses a constant and the POST lands. If the agent is down at that moment, the edge logs the miss and does not retry. The UI is `http://127.0.0.1:8095/`.

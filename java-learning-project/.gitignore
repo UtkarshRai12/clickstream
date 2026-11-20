@@ -12,6 +12,10 @@ data/
 # application.properties holds jwt.hmac-secret and internal.token.
 config/api-keys.csv
 config/application.properties
+# Agent keys (Gemini, Langfuse pk/sk). agent.properties itself has no secrets.
+config/agent.env
+# Langfuse container secrets. Only .env.example is committed.
+ops/langfuse/.env
 
 # Written by Cursor's Java language server (Eclipse JDT). Not an Eclipse install.
 .project

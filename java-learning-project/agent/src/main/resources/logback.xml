@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
   Quiet console while the page is up. Jetty's own debug stream hides the request.
-  The JSON file for the agent process is added when the process gets a main class.
+  Step 8: the agent now has a main class, so it also writes logs/agent.json,
+  one JSON object per line, same shape as logs/edge.json. Alloy tails it.
+  The process cwd must be java-learning-project so logs/ lines up with the mount.
 -->
 <configuration>
   <appender name="console" class="ch.qos.logback.core.ConsoleAppender">
@@ -10,9 +12,26 @@
     </encoder>
   </appender>
 
+  <appender name="jsonFile" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <file>logs/agent.json</file>
+    <immediateFlush>true</immediateFlush>
+    <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+      <fileNamePattern>logs/agent.%d{yyyy-MM-dd}.%i.json</fileNamePattern>
+      <maxFileSize>10MB</maxFileSize>
+      <maxHistory>3</maxHistory>
+    </rollingPolicy>
+    <encoder class="ch.qos.logback.classic.encoder.JsonEncoder">
+      <withFormattedMessage>true</withFormattedMessage>
+      <withContext>false</withContext>
+      <withSequenceNumber>false</withSequenceNumber>
+      <withNanoseconds>false</withNanoseconds>
+    </encoder>
+  </appender>
+
   <logger name="org.eclipse.jetty" level="WARN"/>
 
   <root level="INFO">
     <appender-ref ref="console"/>
+    <appender-ref ref="jsonFile"/>
   </root>
 </configuration>

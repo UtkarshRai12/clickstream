@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
   Stores one ingress report per crossed trigger and serves the page on loopback.
-  The model call comes later. This module does not open Doris.
+  Gemini writes the text when a key is set. Without one, the local writer does.
+  This module does not open Doris.
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -31,6 +32,10 @@
       <artifactId>jackson-datatype-jsr310</artifactId>
     </dependency>
     <dependency>
+      <groupId>dev.langchain4j</groupId>
+      <artifactId>langchain4j-google-ai-gemini</artifactId>
+    </dependency>
+    <dependency>
       <groupId>org.eclipse.jetty</groupId>
       <artifactId>jetty-server</artifactId>
     </dependency>
@@ -52,4 +57,22 @@
       <scope>test</scope>
     </dependency>
   </dependencies>
+
+  <!--
+    Step 8: the main class is set here, so the run command is just
+      mvn -pl agent exec:java
+    from java-learning-project. No -am: the agent has no reactor dependencies,
+    and -am would also try to run exec:java in the parent pom.
+  -->
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>exec-maven-plugin</artifactId>
+        <configuration>
+          <mainClass>com.learning.clickstream.agent.AgentMain</mainClass>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
 </project>

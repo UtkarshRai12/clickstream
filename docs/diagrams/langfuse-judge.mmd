@@ -1,0 +1,23 @@
+%% A report is checked before it is stored. Langfuse judges the stored text after.
+sequenceDiagram
+  participant Edge
+  participant Agent as IncidentService
+  participant Guard as GuardedWriter
+  participant Gemini as Writer model
+  participant LF as Langfuse
+  participant Judge as Judge model
+
+  Edge->>Agent: POST /api/incidents (snapshot)
+  Agent->>Guard: writeReport(snapshot)
+  Guard->>Gemini: prompt from Langfuse, or the hardcoded rules
+  Gemini-->>Guard: report text and token counts
+  alt a number is not in the snapshot
+    Guard->>Gemini: same prompt, one retry
+    Gemini-->>Guard: second report
+    Guard->>Guard: still bad, use the local writer
+  end
+  Guard-->>Agent: report that passed, or the local report
+  Agent->>Agent: store the row
+  Agent->>LF: generation, with tokens and the prompt version
+  LF->>Judge: snapshot against the stored report
+  Judge-->>LF: snapshot_faithful
